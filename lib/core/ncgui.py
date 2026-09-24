@@ -5,22 +5,28 @@ Copyright (c) 2006-2025 sqlmap developers (https://sqlmap.org)
 See the file 'LICENSE' for copying permission
 """
 
-import curses
+# Try to import curses, but allow graceful failure on unsupported platforms
+try:
+    import curses
+except ImportError:
+    curses = None
+    HAVE_CURSES = False
+else:
+    HAVE_CURSES = True
 import os
 import subprocess
 import sys
 import tempfile
 
-from lib.core.common import getSafeExString
-from lib.core.common import saveConfig
+from thirdparty.six.moves import configparser as _configparser
+
+from lib.core.common import getSafeExString, saveConfig
 from lib.core.data import paths
 from lib.core.defaults import defaults
 from lib.core.enums import MKSTEMP_PREFIX
-from lib.core.exception import SqlmapMissingDependence
-from lib.core.exception import SqlmapSystemException
+from lib.core.exception import SqlmapMissingDependence, SqlmapSystemException
 from lib.core.settings import IS_WIN
-from thirdparty.six.moves import queue as _queue
-from thirdparty.six.moves import configparser as _configparser
+
 
 class NcursesUI:
     def __init__(self, stdscr, parser):
@@ -723,8 +729,7 @@ class NcursesUI:
                 if self.current_field > 0:
                     self.current_field -= 1
                     # Adjust scroll if needed
-                    if self.current_field < self.scroll_offset:
-                        self.scroll_offset = self.current_field
+                    self.scroll_offset = min(self.scroll_offset, self.current_field)
             elif key == curses.KEY_DOWN:  # Down arrow
                 if self.current_field < len(tab['options']) - 1:
                     self.current_field += 1
@@ -748,10 +753,8 @@ class NcursesUI:
 
 def runNcGui(parser):
     """Main entry point for ncurses GUI"""
-    try:
-        # Check if ncurses is available
-        import curses
-    except ImportError:
+    # Check if ncurses is available
+    if not HAVE_CURSES:
         raise SqlmapMissingDependence("missing 'curses' module (try installing 'windows-curses' on Windows)")
 
     try:
